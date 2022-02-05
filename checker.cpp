@@ -25,29 +25,41 @@ template <typename T>
 bool checkGreaterThanLimit(T value, vector<T> limits) {
   return (value > limits.at(0));
 }
-template <typename T>
-bool IF(T value, vector<T> limits, bool (*function_pointer)(T, vector<T>)) {
-  return (*function_pointer)(value, limits);
-}
-void console_print(string message) {
-  cout << message <<std::endl;
-}
 
-bool batteryIsOk(float temperature, float soc, float chargeRate) {
-  if(IF(temperature, {0, 45}, checkInLimits)) {
-    console_print("Temperature out of range!");
-    return false;
-  } else if(IF(soc, {20, 80}, checkInLimits)) {
-    console_print("State of Charge out of range!");
-    return false;
-  } else if (IF(chargeRate, {0.8}, checkGreaterThanLimit)) {
-    console_print("Charge Rate out of range!");
-    return false;
+class BatteryStatusChecker {
+public:
+  BatteryStatusChecker(float lower_temperature, float upper_temperature, float lower_soc, float upper_soc, float minimum_charge_rate) {
+    this->temperature_lower_limit = lower_temperature;
+    this->temperature_upper_limit = upper_temperature;
+    this->soc_lower_limit = lower_soc;
+    this->soc_upper_limit = upper_soc;
+    this->minimum_charge_rate = minimum_charge_rate;
   }
-  return true;
-}
+  template <typename T>
+  bool IF(T value, vector<T> limits, bool (*function_pointer)(T, vector<T>), string property) {
+    if ((*function_pointer)(value, limits)) {
+      console_print(property);
+      return false;
+    }
+    return true;
+  }
+  bool batteryIsOk(float temperature, float soc, float charge_rate) {
+    temperature_ok = IF(temperature, {temperature_lower_limit, temperature_upper_limit}, checkInLimits, "Temperature");
+    soc_ok = IF(soc, {soc_lower_limit, soc_upper_limit}, checkInLimits, "SOC");
+    charge_rate_ok = IF(charge_rate, {minimum_charge_rate}, checkGreaterThanLimit, "Charge Rate");
+    return temperature_ok && soc_ok && charge_rate_ok;
+  }
+
+private:
+  float temperature_lower_limit, temperature_upper_limit, soc_lower_limit, soc_upper_limit, minimum_charge_rate;
+  bool temperature_ok, soc_ok, charge_rate_ok;
+  void console_print(string property) {
+    cout << property << " out of range! " <<std::endl;
+  }
+};
 
 int main() {
-  assert(batteryIsOk(25, 70, 0.7) == true);
-  assert(batteryIsOk(50, 85, 0) == false);
+  BatteryStatusChecker battery_status_object(0, 45, 20, 80, 0.8);
+  assert(battery_status_object.batteryIsOk(25, 70, 0.7) == true);
+  assert(battery_status_object.batteryIsOk(50, 85, 0) == false);
 }
