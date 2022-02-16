@@ -22,11 +22,27 @@ enum class LanguagesSupported {
 
 template <typename T>
 bool checkInLimits(T value, vector<T> limits) {
-  return (value < limits.at(0) || value >= limits.at(1)); 
+  return (value < limits.at(0) || value > limits.at(1)); 
 }
 template <typename T>
 bool checkGreaterThanLimit(T value, vector<T> limits) {
   return (value > limits.at(0));
+}
+template <typename T>
+std::vector<T> generateBoundaryLimits(T lower_limit, T higher_limit, T tolerance, T maximum_value) {
+  return {lower_limit, lower_limit + tolerance * maximum_value / 100, higher_limit - tolerance * maximum_value / 100, higher_limit, maximum_value};
+}
+template <typename T>
+BoundaryRangeWithTolerance getPropertyStatus(T value, vector<T> limits, T maximum_value, bool (*function_pointer)(T, vector<T>)) {
+  std::vector<T> boundary_limits = generateBoundaryLimits(limits.at(0), limits.at(1), limits.at(2), maximum_value);
+  int position = 0;
+  for (auto itr = boundary_limits.begin(); itr != boundary_limits.end()-1; itr++) {
+    if (!(*function_pointer)(value, {*itr, *(itr + 1)})) {
+      position = itr - boundary_limits.begin() + 1;
+      break;
+    }
+  }
+  return getBoundaryRangeLabelWithTolerance(position);
 }
 
 map<BoundaryRangeWithTolerance, string> english_status_message {
@@ -72,23 +88,6 @@ public:
     this->charge_rate_tolerance = charge_rate_tolerance;
     this->max_temperature = max_temperature;
     this->selected_language = language;
-  }
-  template <typename T>
-  BoundaryRangeWithTolerance getPropertyStatus(T value, vector<T> limits, T maximum_value, bool (*function_pointer)(T, vector<T>)) {
-    std::vector<T> boundary_limits = generateBoundaryLimits(limits.at(0), limits.at(1), limits.at(2), maximum_value);
-    int position = 0;
-    for (auto itr = boundary_limits.begin(); itr != boundary_limits.end()-1; itr++) {
-      if (!(*function_pointer)(value, {*itr, *(itr + 1)})) {
-        position = itr - boundary_limits.begin() + 1;
-        break;
-      }
-    }
-    return getBoundaryRangeLabelWithTolerance(position);
-  }
-
-  template <typename T>
-  std::vector<T> generateBoundaryLimits(T lower_limit, T higher_limit, T tolerance, T maximum_value) {
-    return {lower_limit, lower_limit + tolerance * maximum_value / 100, higher_limit - tolerance * maximum_value / 100, higher_limit, maximum_value};
   }
 
   bool isTemperatureOK(float temperature) {
@@ -141,5 +140,14 @@ private:
 int main() {
   BatteryStatusChecker battery_status_object(0, 45, 20, 80, 0.8, 5, 5, 5, 100, LanguagesSupported::ENGLISH);
   assert(battery_status_object.batteryIsOk(25, 70, 0.7) == true);
-  assert(battery_status_object.batteryIsOk(50, 85, 0) == false);
+  cout << "-----------------------------------" << endl;
+  assert(battery_status_object.batteryIsOk(50, 85, 0.8) == false);
+  cout << "-----------------------------------" << endl;
+  assert(battery_status_object.batteryIsOk(42, 21, 0.7) == false);
+  cout << "-----------------------------------" << endl;
+  BatteryStatusChecker battery_status_object1(0, 45, 20, 80, 0.8, 0, 0, 0, 100, LanguagesSupported::ENGLISH);
+  assert(battery_status_object1.batteryIsOk(50, 85, 0.8) == false);
+  cout << "-----------------------------------" << endl;
+  assert(battery_status_object1.batteryIsOk(42, 21, 0.7) == true);
+  cout << "-----------------------------------" << endl;
 }
