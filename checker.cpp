@@ -76,8 +76,6 @@ public:
   template <typename T>
   BoundaryRangeWithTolerance getPropertyStatus(T value, vector<T> limits, T maximum_value, bool (*function_pointer)(T, vector<T>)) {
     std::vector<T> boundary_limits = generateBoundaryLimits(limits.at(0), limits.at(1), limits.at(2), maximum_value);
-    for(auto itr : boundary_limits) {
-    }
     int position = 0;
     for (auto itr = boundary_limits.begin(); itr != boundary_limits.end()-1; itr++) {
       if (!(*function_pointer)(value, {*itr, *(itr + 1)})) {
