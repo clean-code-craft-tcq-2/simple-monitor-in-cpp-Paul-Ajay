@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <memory>
 using namespace std;
 
 enum class BoundaryRangeWithTolerance {
@@ -66,88 +67,138 @@ map<LanguagesSupported, map<BoundaryRangeWithTolerance, string>> status_message_
   {LanguagesSupported::GERMAN, german_status_message}
 };
 
+std::string getStatusMessage(LanguagesSupported language, BoundaryRangeWithTolerance status) {
+  return status_message_list[language][status];
+}
+
+void consolePrint(string property, string message) {
+  cout <<property <<" : "<< message <<std::endl;
+}
+
+class TemperatureProperty {
+public:
+  TemperatureProperty(float lower_temperature, 
+                      float upper_temperature,
+                      float temperature_tolerance = 0,
+                      float max_temperature = 0)
+    {
+      this->temperature_lower_limit = lower_temperature;
+      this->temperature_upper_limit = upper_temperature;
+      this->temperature_tolerance = temperature_tolerance;
+      this->max_temperature = max_temperature;
+    }
+  BoundaryRangeWithTolerance temperatureStatus(float temperature) {
+    BoundaryRangeWithTolerance range_label_value;
+    range_label_value = getPropertyStatus(
+                                        temperature, 
+                                        {temperature_lower_limit, temperature_upper_limit, temperature_tolerance}, 
+                                        max_temperature, checkInLimits);
+    return range_label_value;
+  }
+private:
+  float temperature_lower_limit, temperature_upper_limit, temperature_tolerance, max_temperature;
+};
+
+class SocProperty {
+public:
+  SocProperty(float lower_soc,
+              float upper_soc, 
+              float soc_tolerance = 0) 
+    {
+      this->lower_soc = lower_soc;
+      this->upper_soc = upper_soc;
+      this->soc_tolerance = soc_tolerance;
+
+    }
+  BoundaryRangeWithTolerance socStatus(float soc) {
+    BoundaryRangeWithTolerance range_label_value;
+    range_label_value = getPropertyStatus(
+                                        soc, 
+                                        {lower_soc, upper_soc, soc_tolerance}, 
+                                        static_cast<float>(100.0), checkInLimits);
+    return range_label_value;
+  }
+private:
+  float lower_soc, upper_soc, soc_tolerance;
+};
+
+class ChargeRateProperty {
+public:
+  ChargeRateProperty(float minimum_charge_rate,
+                    float charge_rate_tolerance = 0)
+    {
+      this->minimum_charge_rate = minimum_charge_rate;
+      this->charge_rate_tolerance = charge_rate_tolerance;
+    }
+  BoundaryRangeWithTolerance chargeRateStatus(float charge_rate) {
+    BoundaryRangeWithTolerance range_label_value;
+    range_label_value = getPropertyStatus(
+                                        charge_rate, 
+                                        {0, minimum_charge_rate, charge_rate_tolerance}, 
+                                        static_cast<float>(1.0), checkInLimits);
+    return range_label_value;
+  }
+private:
+  float minimum_charge_rate, charge_rate_tolerance;
+};
+
 class BatteryStatusChecker {
 public:
-  BatteryStatusChecker(float lower_temperature, 
-                        float upper_temperature, 
-                        float lower_soc,
-                        float upper_soc, 
-                        float minimum_charge_rate, 
-                        float temperature_tolerance = 0,
-                        float soc_tolerance = 0,
-                        float charge_rate_tolerance = 0,
-                        float max_temperature = 0,
-                        LanguagesSupported language = LanguagesSupported::ENGLISH) {
-    this->temperature_lower_limit = lower_temperature;
-    this->temperature_upper_limit = upper_temperature;
-    this->soc_lower_limit = lower_soc;
-    this->soc_upper_limit = upper_soc;
-    this->minimum_charge_rate = minimum_charge_rate;
-    this->temperature_tolerance = temperature_tolerance;
-    this->soc_tolerance = soc_tolerance;
-    this->charge_rate_tolerance = charge_rate_tolerance;
-    this->max_temperature = max_temperature;
-    this->selected_language = language;
+  BatteryStatusChecker(shared_ptr<TemperatureProperty> temperature_object_ptr,
+                        shared_ptr<SocProperty> soc_object_ptr,
+                        shared_ptr<ChargeRateProperty> charge_rate_object_ptr) 
+      : temperature_object(temperature_object_ptr),
+        soc_object(soc_object_ptr),
+        charge_rate_object(charge_rate_object_ptr) 
+  {}
+
+  static bool isPropertyOk(BoundaryRangeWithTolerance status) {
+    return status == BoundaryRangeWithTolerance::NORMAL;
   }
 
-  bool isTemperatureOK(float temperature) {
-    BoundaryRangeWithTolerance range_label_value;
-    range_label_value = getPropertyStatus(temperature, {temperature_lower_limit, temperature_upper_limit, temperature_tolerance}, max_temperature, checkInLimits);
-    consolePrint("Temperature",status_message_list[selected_language][range_label_value]);
-    if(range_label_value != BoundaryRangeWithTolerance::NORMAL)
-      return false;
-    else
-      return true;
-  }
-
-  bool isSocOk(float soc){
-    BoundaryRangeWithTolerance range_label_value;
-    range_label_value = getPropertyStatus(soc, {soc_lower_limit, soc_upper_limit, soc_tolerance}, static_cast<float>(100.0), checkInLimits);
-    consolePrint("SOC", status_message_list[selected_language][range_label_value]);
-    if(range_label_value != BoundaryRangeWithTolerance::NORMAL)
-      return false;
-    else
-      return true;
-  }
-  bool isChargeRateOk(float charge_rate) {
-    BoundaryRangeWithTolerance range_label_value;
-    range_label_value = getPropertyStatus(charge_rate, {0, minimum_charge_rate, charge_rate_tolerance}, static_cast<float>(1.0), checkInLimits);
-    consolePrint("Charge Rate", status_message_list[selected_language][range_label_value]);
-    if(range_label_value != BoundaryRangeWithTolerance::NORMAL)
-      return false;
-    else
-      return true;    
-  }
-
-  bool batteryIsOk(float temperature, float soc, float charge_rate) {
-    temperature_ok = isTemperatureOK(temperature);
-    soc_ok = isSocOk(soc);
-    charge_rate_ok = isChargeRateOk(charge_rate);
-    return temperature_ok && soc_ok && charge_rate_ok;
+  bool batteryIsOk(
+                  float temperature, 
+                  float soc, 
+                  float charge_rate, 
+                  LanguagesSupported language, 
+                  void (*print_function_pointer)(std::string ,std::string)) {
+    BoundaryRangeWithTolerance temperature_stauts, soc_status, charge_rate_status;
+    temperature_stauts = temperature_object->temperatureStatus(temperature);
+    (*print_function_pointer)("Temperature", getStatusMessage(language, temperature_stauts));
+    soc_status = soc_object->socStatus(soc);
+    (*print_function_pointer)("SOC", getStatusMessage(language, temperature_stauts));
+    charge_rate_status = charge_rate_object->chargeRateStatus(charge_rate);
+    (*print_function_pointer)("Charge Rate", getStatusMessage(language, temperature_stauts));
+    return isPropertyOk(temperature_stauts) && isPropertyOk(soc_status) && isPropertyOk(charge_rate_status);
   }
 
 private:
-  float temperature_lower_limit, temperature_upper_limit, soc_lower_limit, soc_upper_limit, minimum_charge_rate;
-  float temperature_tolerance, soc_tolerance, charge_rate_tolerance;
-  float max_temperature;
-  bool temperature_ok, soc_ok, charge_rate_ok;
-  void consolePrint(string property, string message) {
-    cout <<property <<" : "<< message <<std::endl;
-  }
+  std::shared_ptr<TemperatureProperty> temperature_object;
+  std::shared_ptr<SocProperty> soc_object;
+  std::shared_ptr<ChargeRateProperty> charge_rate_object;
+
   LanguagesSupported selected_language;
 };
 
 int main() {
-  BatteryStatusChecker battery_status_object(0, 45, 20, 80, 0.8, 5, 5, 5, 100, LanguagesSupported::ENGLISH);
-  assert(battery_status_object.batteryIsOk(25, 70, 0.7) == true);
+  shared_ptr<TemperatureProperty> temperature_object(new TemperatureProperty(0.0, 45.0, 5.0, 100.0));
+  shared_ptr<SocProperty> soc_object(new SocProperty(20, 80, 5));
+  shared_ptr<ChargeRateProperty> charge_rate_object(new ChargeRateProperty(0.8, 5));
+
+  BatteryStatusChecker battery_status_object(temperature_object, soc_object, charge_rate_object);
+  assert(battery_status_object.batteryIsOk(25, 70, 0.7, LanguagesSupported::ENGLISH, consolePrint) == true);
   cout << "-----------------------------------" << endl;
-  assert(battery_status_object.batteryIsOk(50, 85, 0.8) == false);
+  assert(battery_status_object.batteryIsOk(50, 85, 0.8, LanguagesSupported::GERMAN, consolePrint) == false);
   cout << "-----------------------------------" << endl;
-  assert(battery_status_object.batteryIsOk(42, 21, 0.7) == false);
+  assert(battery_status_object.batteryIsOk(42, 21, 0.7, LanguagesSupported::ENGLISH, consolePrint) == false);
   cout << "-----------------------------------" << endl;
-  BatteryStatusChecker battery_status_object1(0, 45, 20, 80, 0.8, 0, 0, 0, 100, LanguagesSupported::ENGLISH);
-  assert(battery_status_object1.batteryIsOk(50, 85, 0.8) == false);
+
+  shared_ptr<TemperatureProperty> temperature_object1(new TemperatureProperty(0, 45, 0, 100));
+  shared_ptr<SocProperty> soc_object1(new SocProperty(20, 80, 0));
+  shared_ptr<ChargeRateProperty> charge_rate_object1(new ChargeRateProperty(0.8, 0));
+  BatteryStatusChecker battery_status_object1(temperature_object1, soc_object1, charge_rate_object1);
+  assert(battery_status_object1.batteryIsOk(50, 85, 0.8, LanguagesSupported::GERMAN, consolePrint) == false);
   cout << "-----------------------------------" << endl;
-  assert(battery_status_object1.batteryIsOk(42, 21, 0.7) == true);
+  assert(battery_status_object1.batteryIsOk(42, 21, 0.7, LanguagesSupported::ENGLISH, consolePrint) == true);
   cout << "-----------------------------------" << endl;
 }
