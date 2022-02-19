@@ -147,9 +147,9 @@ public:
   BatteryStatusChecker(shared_ptr<TemperatureProperty> temperature_object_ptr,
                         shared_ptr<SocProperty> soc_object_ptr,
                         shared_ptr<ChargeRateProperty> charge_rate_object_ptr) 
-      : temperature_object(temperature_object_ptr),
-        soc_object(soc_object_ptr),
-        charge_rate_object(charge_rate_object_ptr) 
+    : temperature_object(temperature_object_ptr),
+      soc_object(soc_object_ptr),
+      charge_rate_object(charge_rate_object_ptr) 
   {}
 
   static bool isPropertyOk(BoundaryRangeWithTolerance status) {
@@ -176,8 +176,6 @@ private:
   std::shared_ptr<TemperatureProperty> temperature_object;
   std::shared_ptr<SocProperty> soc_object;
   std::shared_ptr<ChargeRateProperty> charge_rate_object;
-
-  LanguagesSupported selected_language;
 };
 
 int main() {
